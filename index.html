@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Skalierung">
+<meta name="theme-color" content="#1f6fd1">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Skalierungsrechner</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #dcdcd6;
+    --accent: #1f6fd1; --accent-bg: #e6f0fb;
+    --ok: #2e7d32; --ok-bg: #e8f5e9; --warn: #8a5a00; --warn-bg: #fff4dc; --err: #b3261e; --err-bg: #fdeceb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615; --card: #222220; --text: #ececea; --muted: #a3a39d; --line: #3a3a37;
+      --accent: #7fb2f0; --accent-bg: #1c2d42;
+      --ok: #8fd694; --ok-bg: #1d2f1f; --warn: #f3c56b; --warn-bg: #352a12; --err: #f2938c; --err-bg: #3a1d1b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; padding: 16px 16px 40px; }
+  h1 { font-size: 22px; margin: 4px 0 0; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  label.l { display: block; font-size: 14px; color: var(--muted); margin: 10px 0 4px; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .seg button { padding: 10px 4px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--text); font-size: 15px; }
+  .seg button.on { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row .to { color: var(--muted); font-size: 14px; }
+  .num { display: flex; flex: 1; min-width: 0; }
+  .num input { flex: 1; min-width: 0; border-radius: 8px 0 0 8px; }
+  .num .pm { border: 1px solid var(--line); border-left: 0; border-radius: 0 8px 8px 0; background: transparent; color: var(--muted); width: 38px; font-size: 16px; }
+  input { font-size: 16px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); width: 100%; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input:disabled { color: var(--muted); background: transparent; }
+  .unit { width: 76px; flex: none; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 12px 0 4px; }
+  .check input { width: auto; }
+  .big .row { margin-bottom: 10px; }
+  .big .name { width: 92px; flex: none; font-size: 15px; }
+  .big .name small { display: block; color: var(--muted); font-size: 12px; }
+  .big input { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .status { border-radius: 10px; padding: 10px 12px; font-size: 15px; margin-bottom: 14px; }
+  .status.ok { background: var(--ok-bg); color: var(--ok); }
+  .status.warn { background: var(--warn-bg); color: var(--warn); }
+  .status.err { background: var(--err-bg); color: var(--err); }
+  .calc { font-size: 14px; font-variant-numeric: tabular-nums; }
+  .calc p { margin: 0 0 6px; }
+  .calc code { font-size: 13px; }
+  .note { color: var(--muted); font-size: 12px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Skalierungsrechner</h1>
+  <p class="sub">Analogwerte für Siemens S7 umrechnen</p>
+
+  <section class="card">
+    <h2>Einstellungen</h2>
+    <label class="l">Signal</label>
+    <div class="seg" id="sig">
+      <button data-s="4-20">4–20 mA</button>
+      <button data-s="0-10">0–10 V</button>
+      <button data-s="pm10">±10 V</button>
+    </div>
+
+    <label class="l">Messbereich</label>
+    <div class="row">
+      <div class="num"><input id="m0" inputmode="decimal" autocomplete="off"><button class="pm" data-for="m0" aria-label="Vorzeichen wechseln">±</button></div>
+      <span class="to">bis</span>
+      <div class="num"><input id="m1" inputmode="decimal" autocomplete="off"><button class="pm" data-for="m1" aria-label="Vorzeichen wechseln">±</button></div>
+      <input id="unit" class="unit" placeholder="Einheit" autocomplete="off">
+    </div>
+
+    <label class="check"><input type="checkbox" id="siemens"> Rohwert nach Siemens-Standard</label>
+    <div class="row">
+      <div class="num"><input id="r0" inputmode="decimal" autocomplete="off"><button class="pm" data-for="r0" aria-label="Vorzeichen wechseln">±</button></div>
+      <span class="to">bis</span>
+      <div class="num"><input id="r1" inputmode="decimal" autocomplete="off"><button class="pm" data-for="r1" aria-label="Vorzeichen wechseln">±</button></div>
+    </div>
+  </section>
+
+  <section class="card big">
+    <h2>Umrechnen – ein Feld ausfüllen</h2>
+    <div class="row">
+      <span class="name">Signal<small id="sigUnit">mA</small></span>
+      <div class="num"><input id="vs" inputmode="decimal" autocomplete="off"><button class="pm" data-for="vs" aria-label="Vorzeichen wechseln">±</button></div>
+    </div>
+    <div class="row">
+      <span class="name">Rohwert<small>SPS (INT)</small></span>
+      <div class="num"><input id="vr" inputmode="decimal" autocomplete="off"><button class="pm" data-for="vr" aria-label="Vorzeichen wechseln">±</button></div>
+    </div>
+    <div class="row">
+      <span class="name">Messwert<small id="measUnit">%</small></span>
+      <div class="num"><input id="vm" inputmode="decimal" autocomplete="off"><button class="pm" data-for="vm" aria-label="Vorzeichen wechseln">±</button></div>
+    </div>
+  </section>
+
+  <div class="status ok" id="status">Im Nennbereich.</div>
+
+  <section class="card">
+    <h2>Rechenweg</h2>
+    <div class="calc" id="calc"></div>
+  </section>
+
+  <p class="note">Grenzwerte für Über- und Untersteuerung nach Siemens-Dokumentation für S7-Analogbaugruppen (Nennbereich 0 bis 27648, Übersteuerung bis 32511). Einzelne Baugruppen können abweichen, im Zweifel das Gerätehandbuch prüfen. Grenzen für Ausfallsignale bei 4–20 mA nach NAMUR NE 43.</p>
+</main>
+
+<script>
+const SIG = {
+  "4-20": { s0: 4, s1: 20, u: "mA", over: 22.81, under: 1.185, bip: false },
+  "0-10": { s0: 0, s1: 10, u: "V", over: 11.759, under: null, bip: false },
+  "pm10": { s0: -10, s1: 10, u: "V", over: 11.759, under: -11.759, bip: true }
+};
+const KEY = "skalierungsrechner-v1";
+const $ = id => document.getElementById(id);
+let st = { sig: "4-20", m0: "0", m1: "100", unit: "%", siemens: true, r0: "0", r1: "27648", src: "vs", val: "12" };
+
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) st = Object.assign(st, s); } catch (e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+
+function num(v) {
+  const t = String(v).trim().replace(/\s/g, "").replace(",", ".").replace("−", "-");
+  if (t === "" || t === "-" || isNaN(Number(t))) return null;
+  return Number(t);
+}
+function fmt(n, d = 3) { return n.toLocaleString("de-DE", { maximumFractionDigits: d, useGrouping: false }); }
+
+function applySettings() {
+  document.querySelectorAll("#sig button").forEach(b => b.classList.toggle("on", b.dataset.s === st.sig));
+  const g = SIG[st.sig];
+  if (st.siemens) { st.r0 = g.bip ? "-27648" : "0"; st.r1 = "27648"; }
+  $("m0").value = st.m0; $("m1").value = st.m1; $("unit").value = st.unit;
+  $("siemens").checked = st.siemens;
+  $("r0").value = st.r0; $("r1").value = st.r1;
+  $("r0").disabled = $("r1").disabled = st.siemens;
+  $("sigUnit").textContent = g.u;
+  $("measUnit").textContent = st.unit || "–";
+}
+
+function status(cls, text) { const s = $("status"); s.className = "status " + cls; s.textContent = text; }
+
+function check(s) {
+  const g = SIG[st.sig], S7 = st.siemens;
+  if (st.sig === "4-20") {
+    if (s > 22.81) return ["err", "Überlauf: über 22,81 mA." + (S7 ? " Die S7 liefert 32767 (16#7FFF)." : "")];
+    if (s >= 21) return ["err", "Ausfallsignal nach NAMUR NE 43 (ab 21 mA): Der Sensor meldet einen Fehler."];
+    if (s > 20.5) return ["warn", "Grenzbereich 20,5 bis 21 mA: nach NE 43 kein gültiger Messwert mehr."];
+    if (s > 20) return ["warn", "Über dem Messbereich, nach NE 43 bis 20,5 mA noch gültig." + (S7 ? " S7: Übersteuerungsbereich." : "")];
+    if (s >= 4) return ["ok", "Im Nennbereich."];
+    if (s >= 3.8) return ["warn", "Unter dem Messbereich, nach NE 43 ab 3,8 mA noch gültig." + (S7 ? " S7: Untersteuerungsbereich." : "")];
+    if (s > 3.6) return ["warn", "Grenzbereich 3,6 bis 3,8 mA: nach NE 43 kein gültiger Messwert mehr."];
+    if (s >= 1.185) return ["err", "Ausfallsignal nach NAMUR NE 43 (bis 3,6 mA): Sensorfehler oder Leitungsproblem."];
+    return ["err", "Drahtbruch wahrscheinlich: unter 1,185 mA." + (S7 ? " Die S7 liefert −32768 (16#8000) und meldet Drahtbruch, wenn die Diagnose aktiviert ist." : "")];
+  }
+  if (s > g.over) return ["err", "Überlauf: über " + fmt(g.over) + " V." + (S7 ? " Die S7 liefert 32767 (16#7FFF)." : "")];
+  if (g.under !== null && s < g.under) return ["err", "Unterlauf: unter " + fmt(g.under) + " V." + (S7 ? " Die S7 liefert −32768 (16#8000)." : "")];
+  if (s > g.s1) return ["warn", "Über dem Nennbereich." + (S7 ? " S7: Übersteuerungsbereich." : "")];
+  if (s < g.s0) return ["warn", g.bip ? "Unter dem Nennbereich." + (S7 ? " S7: Untersteuerungsbereich." : "") : "Unter 0 V: unter dem Nennbereich. Signal und Verdrahtung prüfen."];
+  return ["ok", "Im Nennbereich."];
+}
+
+function calc() {
+  const g = SIG[st.sig];
+  const m0 = num(st.m0), m1 = num(st.m1), r0 = num(st.r0), r1 = num(st.r1);
+  const ids = ["vs", "vr", "vm"];
+  if ([m0, m1, r0, r1].includes(null)) { status("err", "Bitte Messbereich und Rohwertbereich vollständig ausfüllen."); $("calc").innerHTML = ""; return; }
+  if (m0 === m1 || r0 === r1) { status("err", "Anfang und Ende eines Bereichs dürfen nicht gleich sein."); $("calc").innerHTML = ""; return; }
+  const v = num(st.val);
+  if (v === null) {
+    ids.filter(i => i !== st.src).forEach(i => $(i).value = "");
+    status("ok", "Gib in eines der drei Felder einen Wert ein."); $("calc").innerHTML = ""; return;
+  }
+  const R = {
+    vs: { a: g.s0, b: g.s1, n: "Signal", u: g.u },
+    vr: { a: r0, b: r1, n: "Rohwert", u: "" },
+    vm: { a: m0, b: m1, n: "Messwert", u: st.unit }
+  };
+  const src = R[st.src];
+  const x = (v - src.a) / (src.b - src.a);
+  const out = {};
+  ids.forEach(i => { out[i] = R[i].a + x * (R[i].b - R[i].a); });
+  let plc = Math.round(out.vr), plcNote = "";
+  if (st.siemens && out.vs > g.over) { plc = 32767; plcNote = " → Überlauf, die S7 liefert 32767"; }
+  else if (st.siemens && g.under !== null && out.vs < g.under) { plc = -32768; plcNote = " → Unterlauf, die S7 liefert −32768"; }
+  ids.filter(i => i !== st.src).forEach(i => { $(i).value = i === "vr" ? fmt(plc, 0) : fmt(out[i]); });
+
+  const [cls, text] = check(out.vs);
+  status(cls, text);
+
+  const u = t => t ? " " + t : "";
+  let h = "<p>1. Anteil am Bereich (0 = Anfang, 1 = Ende):<br><code>(" + fmt(v) + " − " + fmt(src.a) + ") ÷ (" + fmt(src.b) + " − " + fmt(src.a) + ") = " + fmt(x, 5) + "</code></p>";
+  let k = 2;
+  ids.filter(i => i !== st.src).forEach(i => {
+    const r = R[i];
+    h += "<p>" + (k++) + ". " + r.n + " = Anfang + Anteil × (Ende − Anfang):<br><code>" + fmt(r.a) + " + " + fmt(x, 5) + " × (" + fmt(r.b) + " − " + fmt(r.a) + ") = " + fmt(out[i]) + u(r.u) + "</code>" + (i === "vr" ? (plcNote || " → gerundet " + fmt(plc, 0)) : "") + "</p>";
+  });
+  h += "<p class='note'>In der S7 entspricht das <code>NORM_X</code> (Rohwert → Anteil) und danach <code>SCALE_X</code> (Anteil → Messwert).</p>";
+  $("calc").innerHTML = h;
+}
+
+function refresh() { applySettings(); calc(); save(); }
+
+document.querySelectorAll("#sig button").forEach(b => b.addEventListener("click", () => {
+  st.sig = b.dataset.s; st.src = "vs"; st.val = st.sig === "4-20" ? "12" : (st.sig === "0-10" ? "5" : "0");
+  $("vs").value = st.val; refresh();
+}));
+["m0", "m1", "unit", "r0", "r1"].forEach(id => $(id).addEventListener("input", () => { st[id] = $(id).value; $("measUnit").textContent = st.unit || "–"; calc(); save(); }));
+$("siemens").addEventListener("change", () => { st.siemens = $("siemens").checked; refresh(); });
+["vs", "vr", "vm"].forEach(id => $(id).addEventListener("input", () => { st.src = id; st.val = $(id).value; calc(); save(); }));
+document.querySelectorAll(".pm").forEach(b => b.addEventListener("click", () => {
+  const i = $(b.dataset.for); if (i.disabled) return;
+  const t = i.value.trim();
+  i.value = t.startsWith("-") || t.startsWith("−") ? t.slice(1) : "-" + t;
+  i.dispatchEvent(new Event("input"));
+}));
+
+applySettings();
+$(st.src).value = st.val;
+calc();
+
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
